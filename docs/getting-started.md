@@ -48,4 +48,3 @@ Both buses must exist in your project's **Audio Bus Layout** or registration sil
 - [API Reference](api-reference.md) — every public method on `AudioHost`, the handlers, and `AudioOptions`.
 - [Custom Buses](custom-buses.md) — registering your own buses beyond `SFX`/`Music`.
 - [Extending](extending.md) — subclassing handlers, custom eviction, custom node types.
-- Runnable code for everything above lives in [`examples/`](../examples/).
