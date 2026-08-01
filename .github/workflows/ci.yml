@@ -24,7 +24,7 @@ jobs:
         run: dotnet restore
 
       - name: Build C# Solution
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build --no-restore
 
       - name: Setup Godot Engine (Mono/C#)
         uses: chickensoft-games/setup-godot@v2
