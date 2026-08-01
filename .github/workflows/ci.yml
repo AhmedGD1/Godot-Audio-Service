@@ -1,0 +1,37 @@
+name: CI Build & Sanity Check
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  build:
+    name: Build & Verify C# Engine
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet Packages
+        run: dotnet restore
+
+      - name: Build C# Solution
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Setup Godot Engine (Mono/C#)
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.1
+          use-dotnet: true
+          include-templates: false
+
+      - name: Run Godot Headless Project Import
+        run: godot --headless --editor --quit

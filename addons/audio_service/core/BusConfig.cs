@@ -8,4 +8,4 @@ public enum BusBehaviorMode
     Streamed
 }
 
-public record BusConfig(StringName BusName, BusBehaviorMode Mode);
+public record struct BusConfig(StringName BusName, BusBehaviorMode Mode);

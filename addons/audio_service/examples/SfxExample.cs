@@ -1,15 +1,14 @@
 // SfxExample.cs
 //
-// Demonstrates the simplest use case: firing one-shot sound effects
-// through the "SFX" pooled bus. No node reference bookkeeping required —
-// pooled players return themselves to the pool automatically once their
-// stream finishes.
+// Simplest use case: play a one-shot sound effect through the built-in
+// pooled "SFX" bus. No node bookkeeping needed — the player returns
+// itself to the pool automatically once the sound finishes.
 //
-// Attach this script to any Node in a test scene, assign `ClickSound`
-// in the inspector, and press Space / click to hear it play.
+// Attach to any Node, assign ClickSound in the inspector, press Space.
 
 using Godot;
-using AudioService;
+
+namespace AudioService.Examples;
 
 public partial class SfxExample : Node
 {
@@ -17,30 +16,7 @@ public partial class SfxExample : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is InputEventKey { Pressed: true, Keycode: Key.Space }
-            || @event is InputEventMouseButton { Pressed: true })
-        {
-            PlayClick();
-        }
-    }
-
-    private void PlayClick()
-    {
-        if (ClickSound is null)
-        {
-            GD.PushWarning("[SfxExample] Assign a ClickSound in the inspector first.");
-            return;
-        }
-
-        // Plain playback at default volume/pitch.
-        AudioHost.Instance.PlaySfx(ClickSound);
-
-        // Or with per-call customization: quieter, slightly higher pitch,
-        // and a bit of pitch randomization so repeated clicks don't sound identical.
-        AudioHost.Instance.PlaySfx(ClickSound, new AudioOptions(
-            VolumeDb: -4f,
-            PitchScale: 1.1f,
-            PitchVariance: 0.05f
-        ));
+        if (@event is InputEventKey { Pressed: true, Keycode: Key.Space })
+            AudioHost.Instance.PlaySfx(ClickSound);
     }
 }

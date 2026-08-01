@@ -2,7 +2,7 @@ using Godot;
 
 namespace AudioService.Handlers;
 
-public sealed class StreamedBusHandler
+public partial class StreamedBusHandler
 {
     private readonly Node owner;
 
@@ -23,7 +23,7 @@ public sealed class StreamedBusHandler
         owner.AddChild(channelB);
     }
 
-    public void PlayStream(AudioStream stream, float fadeDuration = 1f)
+    public virtual void PlayStream(AudioStream stream, float fadeDuration = 1f)
     {
         var targetChannel = (activeChannel == channelA) ? channelB : channelA;
         var outgoingChannel = activeChannel;
@@ -43,7 +43,7 @@ public sealed class StreamedBusHandler
         }
     }
 
-    public void StopStream(float fadeDuration = 1f)
+    public virtual void StopStream(float fadeDuration = 1f)
     {
         if (activeChannel == null)
             return;

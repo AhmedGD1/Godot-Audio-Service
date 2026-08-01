@@ -1,22 +1,13 @@
 // CustomBusExample.cs
 //
-// Demonstrates registering your own bus beyond the built-in "SFX"
-// (pooled) and "Music" (streamed) buses that AudioHost registers by
-// default. Useful for e.g. a dedicated "Ambience" streamed bus, a
-// "UI" pooled bus separate from gameplay SFX, or a "VoiceOver" bus.
+// Demonstrates registering your own bus beyond the built-in "SFX" and
+// "Music" buses — e.g. a separate "UI" pooled bus or an "Ambience"
+// streamed bus. The bus name must already exist in your project's
+// Audio Bus Layout (Project > Audio Bus Layout).
 //
-// IMPORTANT: the bus name you pass to RegisterBus must already exist
-// in your Godot project's Audio bus layout (Project > Audio Bus Layout),
-// otherwise registration is skipped with a console warning and the
-// bus will silently do nothing when played.
-//
-// Attach to any Node and call RegisterCustomBuses() before you try to
-// play anything on them — e.g. from an early _Ready(), or your own
-// game-init sequence. AudioHost itself is an autoload, so it already
-// exists by the time your own _Ready() code runs.
+// Attach to any Node and call _Ready() before playing anything on them.
 
 using Godot;
-using AudioService.Handlers;
 
 namespace AudioService.Examples;
 
@@ -27,31 +18,14 @@ public partial class CustomBusExample : Node
 
     public override void _Ready()
     {
-        RegisterCustomBuses();
-        UseCustomBuses();
-    }
+        AudioHost.Instance.RegisterPooledBus("UI", capacity: 8);
+        AudioHost.Instance.RegisterStreamedBus("Ambience");
 
-    private void RegisterCustomBuses()
-    {
-        // A pooled bus for UI sounds, kept separate from gameplay SFX
-        // so you can duck/mute them independently in the Audio Bus Layout.
-        AudioHost.Instance.RegisterBus(new BusConfig("UI", BusBehaviorMode.Pooled));
+        // Pooled custom bus: fetch the handler and call Play directly.
+        var uiBus = AudioHost.Instance.GetPooledBus("UI");
+        uiBus?.Play(UiClickSound, new AudioOptions(VolumeDb: -3f));
 
-        // A streamed bus for ambient loops (wind, rain, room tone) that
-        // crossfades the same way Music does.
-        AudioHost.Instance.RegisterBus(new BusConfig("Ambience", BusBehaviorMode.Streamed));
-    }
-
-    private void UseCustomBuses()
-    {
-        // Pooled custom bus: fetch the handler directly and call Play/Play2D/Play3D.
-        PooledBusHandler uiBus = AudioHost.Instance.GetPooledBus("UI");
-        if (UiClickSound is not null)
-            uiBus?.Play(UiClickSound, new AudioOptions(VolumeDb: -3f));
-
-        // Streamed custom bus: use the generic extension overload that takes a bus name,
-        // or fetch the handler directly via GetStreamedBus and call PlayStream/StopStream on it.
-        if (AmbienceLoop is not null)
-            AudioHost.Instance.PlayStream("Ambience", AmbienceLoop, fadeDuration: 4f);
+        // Streamed custom bus: use the generic PlayStream overload.
+        AudioHost.Instance.PlayStream("Ambience", AmbienceLoop, fadeDuration: 4f);
     }
 }

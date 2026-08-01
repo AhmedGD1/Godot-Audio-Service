@@ -4,10 +4,8 @@ using Godot;
 
 namespace AudioService.Handlers;
 
-public sealed class PooledBusHandler
+public partial class PooledBusHandler
 {
-    public int Capacity { get; set; } = 16;
-    
     private readonly StringName busName;
     private readonly Node container;
 
@@ -15,37 +13,56 @@ public sealed class PooledBusHandler
     private readonly Stack<AudioStreamPlayer2D> pool2D = new();
     private readonly Stack<AudioStreamPlayer3D> pool3D = new();
 
-    public PooledBusHandler(Node owner, StringName busName)
+    private readonly int capacity;
+
+    private RandomNumberGenerator rng;
+
+    public PooledBusHandler(Node owner, StringName busName, int capacity, RandomNumberGenerator rng = null)
     {
         this.busName = busName;
+        this.capacity = capacity;
+
+        this.rng = rng ?? new RandomNumberGenerator { Seed = GD.Randi() };
+
         container = new Node { Name = $"{busName}_Pool" };
         owner.AddChild(container);
     }
 
-    #region Play
+    public void SeedRng(ulong seed) => rng = new RandomNumberGenerator { Seed = seed };
 
-    public AudioStreamPlayer Play(AudioStream stream, AudioOptions options)
+    protected virtual TNode Acquire<TNode>(Stack<TNode> pool) where TNode : Node, new()
+        => pool.TryPop(out var p) && GodotObject.IsInstanceValid(p) ? p : CreateNode(pool);
+
+    protected virtual void Release<TNode>(Stack<TNode> pool, TNode player) where TNode : Node
     {
-        return PlayInternal(pool1D, stream, options, new Player1DAdapter());
+        if (pool.Count >= capacity) player.QueueFree();
+        else pool.Push(player);
     }
 
-    public AudioStreamPlayer2D Play2D(AudioStream stream, Vector2 position, AudioOptions options)
+    #region Play
+
+    public virtual AudioStreamPlayer Play(AudioStream stream, AudioOptions options)
     {
-        var player = PlayInternal(pool2D, stream, options, new Player2DAdapter());
+        return Commit(pool1D, stream, options, new Player1DAdapter());
+    }
+
+    public virtual AudioStreamPlayer2D Play2D(AudioStream stream, Vector2 position, AudioOptions options)
+    {
+        var player = Commit(pool2D, stream, options, new Player2DAdapter());
         player.GlobalPosition = position;
         return player;
     }
 
-    public AudioStreamPlayer3D Play3D(AudioStream stream, Vector3 position, AudioOptions options)
+    public virtual AudioStreamPlayer3D Play3D(AudioStream stream, Vector3 position, AudioOptions options)
     {
-        var player = PlayInternal(pool3D, stream, options, new Player3DAdapter());
+        var player = Commit(pool3D, stream, options, new Player3DAdapter());
         player.GlobalPosition = position;
         return player;
     }
 
     #endregion
 
-    private TNode PlayInternal<TNode, TAdapter>(Stack<TNode> pool, AudioStream stream, AudioOptions options, TAdapter adapter)
+    public TNode Commit<TNode, TAdapter>(Stack<TNode> pool, AudioStream stream, AudioOptions options, TAdapter adapter)
         where TNode : Node, new()
         where TAdapter : struct, IAudioPlayerAdapter<TNode>
     {
@@ -54,12 +71,12 @@ public sealed class PooledBusHandler
             GD.PushError($"[Audio Service] Can't play a null pooled stream of bus: {busName}.");
             return null;
         }
-        
-        var player = pool.TryPop(out var p) && GodotObject.IsInstanceValid(p) ? p : CreateNode(pool);
+
+        var player = Acquire(pool);
         var pitch = options.PitchScale;
 
         if (options.PitchVariance > 0f)
-            pitch += (float)GD.RandRange(-options.PitchVariance, options.PitchVariance);
+            pitch += rng.RandfRange(-options.PitchVariance, options.PitchVariance);
 
         adapter.SetStream(player, stream);
         adapter.SetBus(player, busName);
@@ -74,13 +91,7 @@ public sealed class PooledBusHandler
     {
         var player = new TNode();
         container.AddChild(player);
-
-        player.Connect("finished", Callable.From(() =>
-        {
-            if (pool.Count >= Capacity) player.QueueFree();
-            else pool.Push(player);
-        }));
-
+        player.Connect("finished", Callable.From(() => Release(pool, player)));
         return player;
     }
 }

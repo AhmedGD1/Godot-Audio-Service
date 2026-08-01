@@ -1,114 +1,100 @@
-# AudioService
+# Audio Service
 
-A lightweight audio bus manager for Godot 4 (C#). Play pooled sound
-effects and crossfaded music through named audio buses, with a simple
-API you can extend for your own game.
+A lightweight, extensible audio management addon for Godot (C#). It gives you a single autoload — `AudioHost` — that manages **buses** for you, so you stop wiring up `AudioStreamPlayer` nodes by hand and start calling `PlaySfx()` / `PlayMusic()` instead.
 
-## Features
+```csharp
+AudioHost.Instance.PlaySfx(ClickSound);
+AudioHost.Instance.PlaySfx3D(ExplosionSound, worldPosition);
+AudioHost.Instance.PlayMusic(GameplayTheme, fadeDuration: 1.5f);
+```
 
-- **Pooled SFX playback** — one-shot sounds (2D, 3D, and non-positional) are handed out from a per-bus pool and reclaimed automatically when they finish, no manual cleanup required.
-- **Streamed music/ambience** — automatic crossfading between tracks on a bus, with fade-in and fade-out support.
-- **Bus-driven configuration** — buses map directly to Godot's Audio Bus Layout, so mixing, effects, and routing stay in the Godot editor where they belong.
-- **Extensible by design** — the built-in `PlaySfx` / `PlayMusic` helpers are just extension methods; add your own for game-specific audio calls.
-- **Adapter-based internals** — a single pooling implementation drives `AudioStreamPlayer`, `AudioStreamPlayer2D`, and `AudioStreamPlayer3D` without duplicated code.
+## Why
+
+Godot gives you `AudioStreamPlayer`, `AudioStreamPlayer2D`, and `AudioStreamPlayer3D` as raw building blocks. Audio Service adds the layer most games end up hand-rolling on top of them:
+
+- **Pooling** — one-shot sounds (SFX) reuse a pool of players per bus instead of spawning/freeing nodes constantly.
+- **Crossfading** — streamed audio (Music) alternates between two channels and tweens volume automatically.
+- **Bus-driven config** — behavior (pooled vs. streamed) is attached to a Godot audio bus, not scattered across scenes.
 
 ## Installation
 
-1. Copy the `addons/audio_service/` folder into your Godot project's `addons/` directory.
-2. In Godot, go to **Project > Project Settings > Plugins** and enable **AudioService**.
-3. This registers `AudioHost` as an autoload singleton automatically — no manual setup needed.
+1. Copy `addons/audio_service` into your project's `addons/` folder.
+2. Enable **Audio Service** under **Project → Project Settings → Plugins**.
+3. Make sure the bus names you intend to use (`SFX`, `Music`, or any custom ones) exist in **Project → Audio Bus Layout**.
 
-## Setup
+The plugin registers an `AudioHost` autoload for you — no manual autoload setup needed.
 
-AudioService registers two buses by default: `SFX` (pooled) and `Music`
-(streamed). Both must exist in your project's **Audio Bus Layout**
-(Project Settings > Audio > Buses) with matching names, or registration
-is skipped with a console warning and playback calls on that bus will
-silently no-op.
-
-You can add your own buses at runtime:
+## Quick start
 
 ```csharp
-AudioHost.Instance.RegisterBus(new BusConfig("Ambience", BusBehaviorMode.Streamed));
-AudioHost.Instance.RegisterBus(new BusConfig("UI", BusBehaviorMode.Pooled));
-```
+// One-shot SFX
+AudioHost.Instance.PlaySfx(ClickSound);
 
-## Usage
+// Positional SFX (2D / 3D)
+AudioHost.Instance.PlaySfx2D(ImpactSound, worldPosition2D);
+AudioHost.Instance.PlaySfx3D(ImpactSound, worldPosition3D);
 
-### Sound effects
-
-```csharp
-// Simple one-shot
-AudioHost.Instance.PlaySfx(clickSound);
-
-// With volume, pitch, and pitch randomization
-AudioHost.Instance.PlaySfx(clickSound, new AudioOptions(
+// Per-call tuning: quieter, slightly pitched up, with variance so repeats don't sound identical
+AudioHost.Instance.PlaySfx(ClickSound, new AudioOptions(
     VolumeDb: -4f,
     PitchScale: 1.1f,
     PitchVariance: 0.05f
 ));
 
-// Positional
-AudioHost.Instance.PlaySfx2D(impactSound, position2D);
-AudioHost.Instance.PlaySfx3D(impactSound, position3D);
-```
-
-Pooled players return themselves to the pool automatically once their
-stream finishes — you don't need to hold a reference or clean anything
-up. Note that pooled sounds currently reclaim only via natural
-completion; there's no built-in way to stop one early (see
-[Limitations](#limitations)).
-
-### Music
-
-```csharp
-AudioHost.Instance.PlayMusic(themeTrack, fadeDuration: 2f);
+// Music, crossfaded automatically between two channels
+AudioHost.Instance.PlayMusic(GameplayTheme, fadeDuration: 1.5f);
 AudioHost.Instance.StopMusic(fadeDuration: 3f);
 ```
 
-Starting a new track crossfades out of whatever was previously playing
-on that bus. The same pattern works on any streamed bus via
-`PlayStream(busName, stream, fadeDuration)` and `StopStream(...)`.
+By default, two buses are registered for you:
 
-### Bus control
+| Bus     | Mode     | Meaning |
+|---------|----------|---------|
+| `SFX`   | Pooled   | Fire-and-forget one-shots, players are recycled |
+| `Music` | Streamed | Long-running tracks, crossfaded via two alternating channels |
+
+## Custom buses
+
+You aren't limited to `SFX` and `Music`. Register any bus your project's audio layout defines:
 
 ```csharp
-AudioHost.Instance.SetBusVolume("Music", 0.5f); // linear 0–1
-AudioHost.Instance.SetBusMute("SFX", true);
+AudioHost.Instance.RegisterPooledBus("UI", capacity: 8);
+AudioHost.Instance.RegisterStreamedBus("Ambience");
+
+// Pooled: fetch the handler and play directly
+var uiBus = AudioHost.Instance.GetPooledBus("UI");
+uiBus?.Play(UiClickSound, new AudioOptions(VolumeDb: -3f));
+
+// Streamed: use the generic PlayStream/StopStream overloads
+AudioHost.Instance.PlayStream("Ambience", AmbienceLoop, fadeDuration: 4f);
 ```
 
-## Extending
+The bus name must already exist in your project's Audio Bus Layout — registration is skipped with a console warning otherwise.
 
-The built-in helpers (`PlaySfx`, `PlayMusic`, etc.) are plain C#
-extension methods on `AudioHost`. Add your own the same way to keep
-game-specific logic out of the plugin:
+See `examples/` for complete, runnable scenes covering SFX, positional audio, music, and custom buses.
+
+## Designed to be extended
+
+Audio Service is deliberately built as a small set of composable, overridable pieces rather than a closed API. Reach past the convenience methods whenever you need to:
+
+- **Subclass the bus handlers.** `PooledBusHandler` and `StreamedBusHandler` are unsealed with `virtual` entry points (`Play` / `Play2D` / `Play3D` / `PlayStream` / `StopStream`), so you can override playback behavior wholesale — e.g. add a concurrency cap, layer in analytics, or change how a bus responds to `Play`.
+- **Override just the pooling strategy.** `PooledBusHandler` exposes `protected virtual Acquire<TNode>` and `Release<TNode>` methods, separate from `Play`. Override `Release` alone to change eviction policy (e.g. priority-based culling instead of a hard capacity cutoff) without touching anything else.
+- **Register your own subclass.** `AudioHost.RegisterPooledBus<T>(busName, handler)` and `RegisterStreamedBus<T>(busName, handler)` accept a handler instance you construct yourself, and the matching generic `GetPooledBus<T>` / `GetStreamedBus<T>` return it back fully typed — no casting required.
+- **Add new player types.** Pooling logic is written once, generically, against `IAudioPlayerAdapter<TNode>` — implement that interface for a new node type and the same `Commit<TNode, TAdapter>` pipeline can pool it. `Player1DAdapter`, `Player2DAdapter`, and `Player3DAdapter` are just the three adapters shipped out of the box.
+- **Add your own high-level API.** `PlaySfx`, `PlaySfx2D`, `PlaySfx3D`, `PlayMusic`, and `StopMusic` are plain C# extension methods on `AudioHost` in `AudioServiceExtensions.cs` — not special-cased members. Add your own extension methods the same way (e.g. `PlayVoiceLine`, `DuckMusic`) instead of modifying `AudioHost` itself.
+- **Control randomness.** Each `PooledBusHandler` takes an optional `RandomNumberGenerator` at construction (or reseed later via `SeedRng(ulong)`), so pitch-variance rolls can be made deterministic — useful for replays or tests.
+- **Bus volume/mute helpers.** `SetBusVolume`, `GetBusVolume`, and `SetBusMute` on `AudioHost` work off linear volume (0–1) and wrap Godot's `AudioServer` for you, but you can always drop to `AudioServer` directly for anything more advanced.
 
 ```csharp
-public static class MyGameAudioExtensions
+// Example: a pooled bus that never exceeds N concurrent players of the *same* stream
+public class LimitedPooledBusHandler : PooledBusHandler
 {
-    public static void PlayFootstep(this AudioHost host, AudioStream stream, Vector3 position)
-    {
-        host.PlaySfx3D(stream, position, new AudioOptions(VolumeDb: -6f, PitchVariance: 0.1f));
-    }
-    
-    public static void PlayVoice(this AudioHost host, AudioStream stream, Vector3 position)
-    {
-        host.GetPooledBus("Voice").Play(stream, new AudioOptions(VolumeDb: 8f, PitchVariance: 0.1f));
-    }
+    public LimitedPooledBusHandler(Node owner, StringName busName, int capacity, RandomNumberGenerator rng = null)
+        : base(owner, busName, capacity, rng) { }
+
+    // override Play / Acquire / Release here to add the limiting behavior
 }
+
+AudioHost.Instance.RegisterPooledBus("SFX", new LimitedPooledBusHandler(AudioHost.Instance, "SFX", capacity: 16));
+var handler = AudioHost.Instance.GetPooledBus<LimitedPooledBusHandler>("SFX"); // typed, no cast
 ```
-
-See [`examples/`](examples/) for complete, runnable scripts covering
-SFX, positional audio, music crossfading, and custom bus registration.
-
-## Limitations
-
-- Pooled players (`SFX` bus, or any custom `Pooled` bus) are only
-  reclaimed when their stream finishes naturally. Calling `.Stop()`
-  directly on a node returned from `PlaySfx`/`PlaySfx2D`/`PlaySfx3D`
-  will stop the sound but the node will **not** return to the pool —
-  it stays alive for the life of the bus. If you need to interrupt a
-  sound early, manage that instance's lifecycle yourself outside the
-  pool.
-- Bus names must match an existing bus in the project's Audio Bus
-  Layout; AudioService does not create buses for you.

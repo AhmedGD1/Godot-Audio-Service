@@ -15,42 +15,69 @@ public partial class AudioHost : Node
     {
         Instance = this;
 
-        RegisterBus(new BusConfig("SFX", BusBehaviorMode.Pooled));
-        RegisterBus(new BusConfig("Music", BusBehaviorMode.Streamed));
+        RegisterPooledBus("SFX");
+        RegisterStreamedBus("Music");
     }
 
-    public void RegisterBus(BusConfig config)
-    {
-        int busIndex = AudioServer.GetBusIndex(config.BusName);
-        if (busIndex == -1)
-        {
-            GD.PushWarning($"[AudioService] Bus '{config.BusName}' does not exist in Godot's AudioServer layout.");
-            return;
-        }
+    #region Register
 
-        if (config.Mode == BusBehaviorMode.Streamed)
-            streamedBuses[config.BusName] = new StreamedBusHandler(this, config.BusName);
-        else
-            pooledBuses[config.BusName] = new PooledBusHandler(this, config.BusName);
+    public void RegisterStreamedBus(StringName busName)
+    {
+        AssertBus(busName);
+        streamedBuses[busName] = new StreamedBusHandler(this, busName);
     }
 
-    public PooledBusHandler GetPooledBus(StringName busName)
+    public void RegisterStreamedBus<T>(StringName busName, T handler) where T : StreamedBusHandler
     {
-        if (pooledBuses.TryGetValue(busName, out var handler))
-            return handler;
+        AssertBus(busName);
+        streamedBuses[busName] = handler;
+    }
+    
+    public void RegisterPooledBus<T>(StringName busName, T handler) where T : PooledBusHandler
+    {
+        AssertBus(busName);
+        pooledBuses[busName] = handler;
+    }
+    
+    public void RegisterPooledBus(StringName busName, int capacity = 8)
+    {
+        AssertBus(busName);
+        pooledBuses[busName] = new PooledBusHandler(this, busName, capacity);
+    }
+
+    #endregion
+
+    #region Bus Capture
+
+    public T GetPooledBus<T>(StringName busName) where T : PooledBusHandler
+    {
+        if (pooledBuses.TryGetValue(busName, out var handler) && handler is T t)
+            return t;
 
         GD.PushError($"[AudioService] Pooled bus '{busName}' is not registered.");
         return null;
     }
 
-    public StreamedBusHandler GetStreamedBus(StringName busName)
+    public T GetStreamedBus<T>(StringName busName) where T : StreamedBusHandler
     {
-        if (streamedBuses.TryGetValue(busName, out var handler))
-            return handler;
+        if (streamedBuses.TryGetValue(busName, out var handler) && handler is T t)
+            return t;
 
         GD.PushError($"[AudioService] Streamed bus '{busName}' is not registered.");
         return null;
     }
+
+    public PooledBusHandler GetPooledBus(StringName busName)
+    {
+        return GetPooledBus<PooledBusHandler>(busName);
+    }
+
+    public StreamedBusHandler GetStreamedBus(StringName busName)
+    {
+        return GetStreamedBus<StreamedBusHandler>(busName);
+    }
+    
+    #endregion
 
     #pragma warning disable CA1822
     public void SetBusVolume(StringName busName, float linearVolume)
@@ -73,4 +100,15 @@ public partial class AudioHost : Node
             AudioServer.SetBusMute(idx, isMuted);
     }
     #pragma warning restore CA1822
+
+    private static bool AssertBus(StringName busName)
+    {
+        int busIndex = AudioServer.GetBusIndex(busName);
+        if (busIndex == -1)
+        {
+            GD.PushWarning($"[AudioService] Bus '{busName}' does not exist in Godot's AudioServer layout.");
+            return false;
+        }
+        return true;
+    }
 }
