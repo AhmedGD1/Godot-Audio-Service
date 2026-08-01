@@ -16,8 +16,8 @@ public partial class StreamedBusHandler
     {
         this.owner = owner;
 
-        channelA = new AudioStreamPlayer { Bus = busName };
-        channelB = new AudioStreamPlayer { Bus = busName };
+        channelA = new AudioStreamPlayer { Bus = busName, Name = $"{busName}_ChannelA" };
+        channelB = new AudioStreamPlayer { Bus = busName, Name = $"{busName}_ChannelB" };
 
         owner.AddChild(channelA);
         owner.AddChild(channelB);
@@ -55,7 +55,7 @@ public partial class StreamedBusHandler
 
     private Tween RecreateTween()
     {
-        if (tween.IsValid())
+        if (tween != null && tween.IsValid())
             tween.Kill();
         return owner.CreateTween();
     }

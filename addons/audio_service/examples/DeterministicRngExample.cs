@@ -19,6 +19,6 @@ public partial class DeterministicRngExample : Node
 
     public void PlayFootstep()
     {
-        AudioHost.Instance.PlaySfx(FootstepSound, new AudioOptions(PitchVariance: 0.1f));
+        AudioHost.Instance.PlaySfx(FootstepSound, pitchVariance: 0.1f);
     }
 }

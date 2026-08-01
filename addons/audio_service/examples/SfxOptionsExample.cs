@@ -17,11 +17,11 @@ public partial class SfxOptionsExample : Node
     {
         if (@event is InputEventKey { Pressed: true, Keycode: Key.Space })
         {
-            AudioHost.Instance.PlaySfx(FootstepSound, new AudioOptions(
-                VolumeDb: -4f,
-                PitchScale: 1f,
-                PitchVariance: 0.08f // +/- random pitch each play
-            ));
+            AudioHost.Instance.PlaySfx(FootstepSound,
+                volumeDb: -4f,
+                pitchScale: 1f,
+                pitchVariance: 0.08f // +/- random pitch each play
+            );
         }
     }
 }

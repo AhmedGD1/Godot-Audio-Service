@@ -35,10 +35,10 @@ AudioHost.Instance.PlaySfx2D(ImpactSound, worldPosition2D);
 AudioHost.Instance.PlaySfx3D(ImpactSound, worldPosition3D);
 
 // Per-call tuning: quieter, slightly pitched up, with variance so repeats don't sound identical
-AudioHost.Instance.PlaySfx(ClickSound, new AudioOptions(
-    VolumeDb: -4f,
-    PitchScale: 1.1f,
-    PitchVariance: 0.05f
+AudioHost.Instance.PlaySfx(ClickSound,
+    volumeDb: -4f,
+    pitchScale: 1.1f,
+    pitchVariance: 0.05f
 ));
 
 // Music, crossfaded automatically between two channels

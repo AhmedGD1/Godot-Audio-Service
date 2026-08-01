@@ -48,9 +48,12 @@ Thin wrappers over Godot's `AudioServer`, working in linear volume (0–1) inste
 Extension methods on `AudioHost`. These are the everyday API — plain C# extension methods, not special-cased members, so you can add your own alongside them.
 
 ```csharp
-AudioStreamPlayer PlaySfx(this AudioHost host, AudioStream stream, AudioOptions options = default)
-AudioStreamPlayer2D PlaySfx2D(this AudioHost host, AudioStream stream, Vector2 position, AudioOptions options = default)
-AudioStreamPlayer3D PlaySfx3D(this AudioHost host, AudioStream stream, Vector3 position, AudioOptions options = default)
+AudioStreamPlayer PlaySfx(this AudioHost host, AudioStream stream,
+    float volumeDb = 0f, float pitchScale = 1f, float pitchVariance = 0f)
+AudioStreamPlayer2D PlaySfx2D(this AudioHost host, AudioStream stream, Vector2 position,
+    float volumeDb = 0f, float pitchScale = 1f, float pitchVariance = 0f)
+AudioStreamPlayer3D PlaySfx3D(this AudioHost host, AudioStream stream, Vector3 position,
+    float volumeDb = 0f, float pitchScale = 1f, float pitchVariance = 0f)
 
 void PlayStream(this AudioHost host, StringName busName, AudioStream stream, float fadeDuration = 1f)
 void StopStream(this AudioHost host, StringName busName, float fadeDuration = 1f)
@@ -59,7 +62,7 @@ void PlayMusic(this AudioHost host, AudioStream stream, float fadeDuration = 1f)
 void StopMusic(this AudioHost host, float fadeDuration = 1f)
 ```
 
-`PlaySfx*` are shortcuts for `GetPooledBus("SFX")?.Play*(...)`. `PlayMusic`/`StopMusic` are shortcuts for `PlayStream`/`StopStream` against the `"Music"` bus. `PlayStream`/`StopStream` work against any streamed bus by name, built-in or custom.
+`PlaySfx*` are shortcuts for `GetPooledBus("SFX")?.Play*(...)` — they take `volumeDb`/`pitchScale`/`pitchVariance` as individual named parameters and wrap them into an `AudioOptions` internally, so most call sites never need to construct one directly. `PlayMusic`/`StopMusic` are shortcuts for `PlayStream`/`StopStream` against the `"Music"` bus. `PlayStream`/`StopStream` work against any streamed bus by name, built-in or custom.
 
 ---
 
@@ -141,3 +144,12 @@ The seam that lets `PooledBusHandler.Commit` pool any node type, not just the th
 Shipped implementations: `Player1DAdapter` (`AudioStreamPlayer`), `Player2DAdapter` (`AudioStreamPlayer2D`), `Player3DAdapter` (`AudioStreamPlayer3D`). See [Extending](extending.md#custom-node-types) for how to add your own.
 
 ---
+
+## `BusConfig`
+
+```csharp
+public enum BusBehaviorMode { Pooled, Streamed }
+public record struct BusConfig(StringName BusName, BusBehaviorMode Mode);
+```
+
+A plain data pair describing a bus's intended behavior. Used internally; you generally won't need to construct this directly since `RegisterPooledBus`/`RegisterStreamedBus` take the parameters directly.
