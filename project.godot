@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="AudioService"
+run/main_scene="uid://c31hnnm0ntjbt"
 config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+AudioHost="*uid://c7leb1uf0myni"
 
 [display]
 
@@ -22,6 +27,10 @@ window/stretch/aspect="expand"
 [dotnet]
 
 project/assembly_name="AudioService"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/audio_service/plugin.cfg")
 
 [physics]
 
