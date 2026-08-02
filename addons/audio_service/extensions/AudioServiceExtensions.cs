@@ -46,13 +46,25 @@ public static class AudioServiceExtensions
         host.StopStream(MusicBusName, fadeDuration);
     }
 
-    public static async Task PlayStreamAsync(this AudioHost host, StringName busName, AudioStream stream, double fadeDuration = 1f)
+    /// <returns>
+    /// True if the stream finished playing on its own; false if it was interrupted
+    /// by another PlayStream/StopStream call on the same bus before it finished.
+    /// </returns>
+    public static async Task<bool> PlayStreamAsync(this AudioHost host, StringName busName, AudioStream stream, double fadeDuration = 1f)
     {
-        await host.GetStreamedBus(busName)?.PlayStreamAsync(stream, fadeDuration);
+        var bus = host.GetStreamedBus(busName);
+        if (bus == null)
+            return false;
+
+        return await bus.PlayStreamAsync(stream, fadeDuration);
     }
-    
-    public static async Task PlayMusicAsync(this AudioHost host, AudioStream stream, double fadeDuration = 1f)
+
+    /// <returns>
+    /// True if the track finished playing on its own; false if it was interrupted
+    /// by another PlayStream/StopStream call on the Music bus before it finished.
+    /// </returns>
+    public static async Task<bool> PlayMusicAsync(this AudioHost host, AudioStream stream, double fadeDuration = 1f)
     {
-        await host.PlayStreamAsync("Music", stream, fadeDuration);
+        return await host.PlayStreamAsync(MusicBusName, stream, fadeDuration);
     }
 }
